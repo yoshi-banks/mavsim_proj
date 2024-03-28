@@ -24,7 +24,8 @@ from viewers.manage_viewers import Viewers
 # initialize elements of the architecture
 mav = MavDynamics(SIM.ts_simulation)
 delta = MsgDelta()
-viewers = Viewers(animation=True, data=True)
+# viewers = Viewers(animation=True, data=True)
+viewers = Viewers()
 
 # initialize the simulation time
 sim_time = SIM.start_time
@@ -34,10 +35,10 @@ end_time = 60
 print("Press 'Esc' to exit...")
 while sim_time < end_time:
     # ------- vary forces and moments to check dynamics -------------
-    fx = 0  # 10
+    fx = -10  # 10
     fy = 0  # 10
-    fz = 100  # 10
-    Mx = 0.1  # 0.1
+    fz = 0  # 10
+    Mx = 0  # 0.1
     My = 0  # 0.1
     Mz = 0  # 0.1
     forces_moments = np.array([[fx, fy, fz, Mx, My, Mz]]).T
@@ -63,4 +64,4 @@ while sim_time < end_time:
     #     break
 
 # Save an Image of the Plot
-viewers.close(dataplot_name="ch3_data_plot")
+viewers.close(dataplot_name="ch3_data_plot", sensorplot_name="")

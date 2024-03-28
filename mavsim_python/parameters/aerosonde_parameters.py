@@ -1,5 +1,10 @@
 import numpy as np
-from tools.rotations import Euler2Quaternion
+# import sys
+# import os
+# # append the relative parent directory to path
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
+from tools.rotations import euler_to_quaternion
+# from tools.rotations import Euler2Quaternion
 
 ######################################################################################
                 #   Initial Conditions
@@ -19,7 +24,7 @@ q0 = 0  # initial pitch rate
 r0 = 0  # initial yaw rate
 Va0 = np.sqrt(u0**2+v0**2+w0**2)
 #   Quaternion State
-e = Euler2Quaternion(phi0, theta0, psi0)
+e = euler_to_quaternion(phi0, theta0, psi0)
 e0 = e.item(0)
 e1 = e.item(1)
 e2 = e.item(2)
@@ -89,6 +94,12 @@ C_n_delta_r = -0.069
 ######################################################################################
                 #   Propeller thrust / torque parameters (see addendum by McLain)
 ######################################################################################
+C_prop = 1.0
+S_prop = 0.2027
+k_motor = 80
+kTp = 0.
+kOmega = 0.
+
 # Prop parameters
 D_prop = 20*(0.0254)     # prop diameter in m
 
@@ -105,12 +116,19 @@ ncells = 12.
 V_max = 3.7 * ncells  # max voltage for specified number of battery cells
 
 # Coeffiecients from prop_data fit
-C_Q2 = -0.01664
-C_Q1 = 0.004970
-C_Q0 = 0.005230
-C_T2 = -0.1079
-C_T1 = -0.06044
-C_T0 = 0.09357
+# C_Q2 = -0.01664
+# C_Q1 = 0.004970
+# C_Q0 = 0.005230
+# C_T2 = -0.1079
+# C_T1 = -0.06044
+# C_T0 = 0.09357
+
+C_Q2 = -0.015729
+C_Q1 = 0.0031409
+C_Q0 = 0.006199
+C_T2 = -0.047394
+C_T1 = -0.13803
+C_T0 = 0.11221
 
 ######################################################################################
                 #   Calculation Variables

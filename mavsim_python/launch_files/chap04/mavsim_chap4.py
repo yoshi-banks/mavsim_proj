@@ -25,7 +25,7 @@ from viewers.manage_viewers import Viewers
 wind = WindSimulation(SIM.ts_simulation)
 mav = MavDynamics(SIM.ts_simulation)
 delta = MsgDelta()
-viewers = viewers = Viewers(animation=True, data=True)
+viewers = viewers = Viewers()
 
 # initialize the simulation time
 sim_time = SIM.start_time
@@ -39,7 +39,8 @@ while sim_time < end_time:
     delta.elevator = -0.1248
     delta.aileron = 0.001836
     delta.rudder = -0.0003026
-    delta.throttle = 0.6768
+    delta.throttle = 0.
+    # delta.throttle = 0.6
 
     # ------- physical system -------------
     current_wind = wind.update()  # get the new wind vector

@@ -26,12 +26,16 @@ from viewers.manage_viewers import Viewers
 # initialize elements of the architecture
 wind = WindSimulation(SIM.ts_simulation)
 mav = MavDynamics(SIM.ts_simulation)
-viewers = viewers = Viewers(animation=True, data=True)
+viewers = viewers = Viewers()
 
 # use compute_trim function to compute trim state and trim input
 Va = 25.
 gamma = 0.*np.pi/180.
 trim_state, trim_input = compute_trim(mav, Va, gamma)
+# test trim
+forces_moments = mav._forces_moments(trim_input)
+xdot = mav._f(trim_state, forces_moments)
+#
 mav._state = trim_state  # set the initial state of the mav to the trim state
 delta = trim_input  # set input to constant constant trim input
 

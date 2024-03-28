@@ -6,6 +6,10 @@ mavsim_python: drawing tools
         7/13/2023 - RWB
         1/16/2024 - RWB
 """
+import sys
+import os
+# append the relative parent directory to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 import numpy as np
 import pyqtgraph.opengl as gl
 from tools.rotations import euler_to_rotation

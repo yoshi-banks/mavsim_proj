@@ -20,7 +20,7 @@ from viewers.manage_viewers import Viewers
 
 # #quitter = QuitListener()
 state = MsgState()
-viewers = viewers = Viewers(animation=True)
+viewers = viewers = Viewers()
 
 # initialize the simulation time
 sim_time = SIM.start_time
@@ -65,4 +65,4 @@ while sim_time < end_time:
     # if quitter.check_quit():
     #     break
 
-viewers.close()
+viewers.close(dataplot_name="", sensorplot_name="")

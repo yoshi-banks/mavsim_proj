@@ -19,7 +19,7 @@ class Viewers:
         self.data_plot_flag = True
         self.sensor_plot_flag = False
         self.animation_flag = True
-        self.save_plot_image_flag = False
+        self.save_plot_image_flag = True
         # initialize video 
         if self.video_flag is True:
             from viewers.video_writer import VideoWriter
@@ -69,12 +69,12 @@ class Viewers:
         if self.video_flag is True: 
             self.video.update(sim_time)
     
-    def close(self, dataplot_name, sensorplot_name):
+    def close(self, dataplot_name="default_dataplot", sensorplot_name="default_sensorplot"):
         # Save an Image of the Plot
         if self.save_plot_image_flag:
-            if self.data_plots_flag: 
+            if self.data_plot_flag: 
                 self.data_view.save_plot_image(dataplot_name)
-            if self.sensor_plots_flag: 
+            if self.sensor_plot_flag: 
                 self.sensor_view.save_plot_image(sensorplot_name)
         if self.video_flag: 
             self.video.close()
