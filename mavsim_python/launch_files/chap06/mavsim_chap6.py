@@ -14,6 +14,7 @@ sys.path.insert(0,os.fspath(Path(__file__).parents[2]))
 # use QuitListener for Linux or PC <- doesn't work on Mac
 #from tools.quit_listener import QuitListener
 import numpy as np
+import time
 import parameters.simulation_parameters as SIM
 from tools.signals import Signals
 from models.mav_dynamics_control import MavDynamics
@@ -84,6 +85,8 @@ while sim_time < end_time:
 
     # -------increment time-------------
     sim_time += SIM.ts_simulation
+
+    time.sleep(0.001)
 
 viewers.close(dataplot_name="ch6_data_plot")
 

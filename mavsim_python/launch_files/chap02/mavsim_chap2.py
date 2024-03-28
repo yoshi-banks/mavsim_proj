@@ -65,4 +65,4 @@ while sim_time < end_time:
     # if quitter.check_quit():
     #     break
 
-viewers.close(dataplot_name="", sensorplot_name="")
+viewers.close()

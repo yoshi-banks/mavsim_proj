@@ -27,22 +27,11 @@ class Autopilot:
                         ki=AP.course_ki,
                         Ts=ts_control,
                         limit=np.radians(30))
-        # self.yaw_damper = YawDamper(
-        #                 k_r=AP.yaw_damper_kr,
-        #                 p_wo=AP.yaw_damper_p_wo,
-        #                 Ts=ts_control)
 
-        # self.yaw_damper = TransferFunction(
-        #                 num=np.array([[AP.yaw_damper_kr, 0]]),
-        #                 den=np.array([[1, AP.yaw_damper_p_wo]]),
-        #                 Ts=ts_control)
-        # self.yaw_damper = TFControl(
-        #                 k=AP.yaw_damper_kr,
-        #                 n0=0.0,
-        #                 n1=1.0,
-        #                 d0=AP.yaw_damper_p_wo,
-        #                 d1=1,
-        #                 Ts=ts_control)
+        self.yaw_damper = TransferFunction(
+                        num=np.array([[AP.yaw_damper_kr, 0]]),
+                        den=np.array([[1, AP.yaw_damper_p_wo]]),
+                        Ts=ts_control)
 
         # instantiate longitudinal controllers
         self.pitch_from_elevator = PDControlWithRate(
@@ -62,26 +51,24 @@ class Autopilot:
         self.commanded_state = MsgState()
 
     def update(self, cmd, state):
-	
-	#### TODO #####
+        
         # lateral autopilot
-
-        phi_c = self.course_from_roll.update(cmd.course_command, state.chi)  #cmd.course_command
-        delta_a = -8.13462186e-09  # Trim state
-        # delta_a = self.roll_from_aileron.update(phi_c, state.phi, state.p) # Controller based on chi command#
-        delta_r = -1.21428507e-08
-        # delta_r = self.yaw_damper.update(cmd.course_command - state.chi) # Controller based on chi command#
+        chi_c = wrap(cmd.course_command, state.chi)
+        phi_c = cmd.phi_feedforward + self.course_from_roll.update(chi_c, state.chi)
+        phi_c = self.saturate(phi_c, -np.radians(30), np.radians(30))
+        delta_a = self.roll_from_aileron.update(phi_c, state.phi, state.p)
+        delta_r = self.yaw_damper.update(state.r)
 
         # longitudinal autopilot
-        h_c = cmd.altitude_command
-        theta_c = np.pi/16
-        # theta_c = self.altitude_from_pitch.update(h_c, state.altitude)
-        delta_e = -1.24785989e-01
-        # delta_e = self.pitch_from_elevator.update(theta_c, state.theta, state.q)
-        # delta_t =  3.14346798e-01 # Trim state
+        # saturate the altitude command
+        altitude_c = self.saturate(cmd.altitude_command,
+                                   state.altitude - AP.altitude_zone, state.altitude + AP.altitude_zone)
+        theta_c = self.altitude_from_pitch.update(altitude_c, state.altitude)
+        delta_e = self.pitch_from_elevator.update(theta_c, state.theta, state.q)
         delta_t = self.airspeed_from_throttle.update(cmd.airspeed_command, state.Va)
+        delta_t = self.saturate(delta_t, 0.0, 1.0)
 
-        # construct control outputs and commanded states
+        # construct output and commanded states
         delta = MsgDelta(elevator=delta_e,
                          aileron=delta_a,
                          rudder=delta_r,
@@ -101,16 +88,3 @@ class Autopilot:
         else:
             output = input
         return output
-
-# TODO replace this with the TransferFunction methods
-class YawDamper:
-    def __init__(self, k_r, p_wo, Ts):
-        self.xi = 0
-        self.Ts = Ts
-        self.k_r = k_r
-        self.p_wo = p_wo
-
-    def update(self, r):
-        self.xi = self.xi + self.Ts * (-self.p_wo * self.xi + self.k_r * r)
-        delta_r = -self.p_wo * self.xi + self.k_r * r
-        return delta_r

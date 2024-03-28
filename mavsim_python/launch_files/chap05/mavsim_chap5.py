@@ -10,6 +10,7 @@ import os, sys
 # insert parent directory at beginning of python search path
 from pathlib import Path
 sys.path.insert(0,os.fspath(Path(__file__).parents[2]))
+import time
 # use QuitListener for Linux or PC <- doesn't work on Mac
 #from tools.quit_listener import QuitListener
 import numpy as np
@@ -87,7 +88,15 @@ while sim_time < end_time:
     # -------increment time-------------
     sim_time += SIM.ts_simulation
 
+    # slow down the loop
+    # import time
+    time.sleep(0.001)
+
+
 viewers.close(dataplot_name="ch5_data_plot")
 
 
 
+# TODO 
+# currently I am unable to actually compute model_coef.py
+# see old coefs from my old mavsim repo
