@@ -11,6 +11,7 @@ mavsim_python
 import os, sys
 # insert parent directory at beginning of python search path
 from pathlib import Path
+import time
 sys.path.insert(0,os.fspath(Path(__file__).parents[2]))
 # use QuitListener for Linux or PC <- doesn't work on Mac
 #from tools.quit_listener import QuitListener
@@ -22,6 +23,7 @@ from models.wind_simulation import WindSimulation
 from controllers.autopilot import Autopilot
 #from controllers.lqr_with_rate_damping import Autopilot
 from estimators.observer import Observer
+# from estimators.observer_old import Observer
 #from estimators.observer_full import Observer
 from viewers.manage_viewers import Viewers
 
@@ -32,7 +34,7 @@ wind = WindSimulation(SIM.ts_simulation)
 mav = MavDynamics(SIM.ts_simulation)
 autopilot = Autopilot(SIM.ts_simulation)
 observer = Observer(SIM.ts_simulation)
-viewers = Viewers(animation=True, data=True)
+viewers = Viewers()
 
 # autopilot commands
 from message_types.msg_autopilot import MsgAutopilot
@@ -67,7 +69,7 @@ while sim_time < end_time:
     measurements = mav.sensors()  # get sensor measurements
     estimated_state = observer.update(measurements)  # estimate states from measurements
     delta, commanded_state = autopilot.update(commands, estimated_state)
-    #delta, commanded_state = autopilot.update(commands, mav.true_state)
+    # delta, commanded_state = autopilot.update(commands, mav.true_state)
 
     # -------- physical system -------------
     current_wind = wind.update()  # get the new wind vector
@@ -80,7 +82,7 @@ while sim_time < end_time:
         estimated_state,  # estimated states
         commanded_state,  # commanded states
         delta,  # inputs to aircraft
-        None,  # measurements
+        measurements,  # measurements
     )
         
     # -------Check to Quit the Loop-------
@@ -89,6 +91,8 @@ while sim_time < end_time:
 
     # -------increment time-------------
     sim_time += SIM.ts_simulation
+
+    # time.sleep(SIM.ts_simulation)
 
 # close viewers
 viewers.close(dataplot_name="ch8_data_plot", 

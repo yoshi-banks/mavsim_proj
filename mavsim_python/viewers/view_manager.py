@@ -60,8 +60,12 @@ class ViewManager:
                     self.mav_view = MAVAndWaypointViewer(app=self.app)
                 elif self.path_flag:
                     self.mav_view = MavAndPathViewer(app=self.app)
+                elif self.waypoint_flag and not self.path_flag:
+                    self.mav_view = MAVAndWaypointViewer(app=self.app)
+                elif not self.path_flag and not self.waypoint_flag:
+                    self.mav_view = MavViewer(app=self.app)
                 else:
-                    self.mav_view = MavViewer(app=self.app)  
+                    raise Exception('Cannot have both path and waypoint flags set to True')
             if self.data_plot_flag: 
                 self.data_view = DataViewer(
                     app=self.app,
@@ -96,8 +100,12 @@ class ViewManager:
                 self.mav_view.update(true_state, path, waypoints)
             elif self.path_flag is True:
                 self.mav_view.update(true_state, path)
+            elif self.waypoint_flag and not self.path_flag:
+                self.mav_view.update(true_state, path, waypoints)
+            elif not self.path_flag and not self.waypoint_flag:
+                self.mav_view.update(true_state)
             else:
-                self.mav_view.update(true_state) 
+                raise Exception('Cannot have both path and waypoint flags set to True')
         if self.data_plot_flag:
             self.data_view.update(
                 true_state,  # true states

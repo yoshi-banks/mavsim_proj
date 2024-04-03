@@ -1,4 +1,4 @@
-The objective of this assignment is to implement several of the path planning
+ The objective of this assignment is to implement several of the path planning
 algorithms described in this chapter. The a map is created similar to those
 shown in figures 12.11 and 12.12. The file draw_map.py, and draw_path.py draws
 the map, the waypoint path, and the current straight-line or orbit that is

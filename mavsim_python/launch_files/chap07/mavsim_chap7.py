@@ -25,7 +25,7 @@ from viewers.manage_viewers import Viewers
 wind = WindSimulation(SIM.ts_simulation)
 mav = MavDynamics(SIM.ts_simulation)
 autopilot = Autopilot(SIM.ts_simulation)
-viewers = viewers = Viewers(animation=True, data=True, sensors=True)
+viewers = Viewers()
 
 # autopilot commands
 from message_types.msg_autopilot import MsgAutopilot

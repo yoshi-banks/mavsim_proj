@@ -18,10 +18,11 @@ import parameters.simulation_parameters as SIM
 from models.mav_dynamics_sensors import MavDynamics
 from models.wind_simulation import WindSimulation
 from controllers.autopilot import Autopilot
-from estimators.observer_full import Observer
-#from estimators.observer import Observer
+# from estimators.observer_full import Observer
+from estimators.observer import Observer
 from planners.path_follower import PathFollower
 from viewers.view_manager import ViewManager
+from viewers.manage_viewers import Viewers
 
 # initialize elements of the architecture
 wind = WindSimulation(SIM.ts_simulation)
@@ -30,13 +31,14 @@ autopilot = Autopilot(SIM.ts_simulation)
 observer = Observer(SIM.ts_simulation)
 path_follower = PathFollower()
 viewers = ViewManager(animation=True, data=True, path=True)
+# viewers = Viewers()
 #quitter = QuitListener()
 
 # path definition
 from message_types.msg_path import MsgPath
 path = MsgPath()
-#path.type = 'line'
-path.type = 'orbit'
+path.type = 'line'
+# path.type = 'orbit'
 if path.type == 'line':
     path.line_origin = np.array([[0.0, 0.0, -100.0]]).T
     path.line_direction = np.array([[0.5, 1.0, 0.0]]).T

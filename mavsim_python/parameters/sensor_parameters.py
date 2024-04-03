@@ -18,6 +18,10 @@ diff_pres_sigma = 0.002*1000  # standard deviation of diff pressure sensor in Pa
 #-------- Magnetometer --------
 mag_beta = np.radians(1.0)
 mag_sigma = np.radians(0.03)
+# magnetic field in provo has magnetic declination of 12.5 degrees
+# and magnetic inclination of 66 degrees
+mag_inclination = 66 
+mag_declination = 12.5
 
 # #-------- GPS --------
 # ts_gps = 1.0
