@@ -10,6 +10,8 @@ class RRTDubins:
         self.dubins_path = DubinsParameters()
 
     def update(self, start_pose, end_pose, Va, world_map, radius):
+        raise NotImplementedError
+
         self.segment_length = 4 * radius
         tree = MsgWaypoints()
         tree.type = 'dubins'
@@ -18,13 +20,30 @@ class RRTDubins:
 
         ##### TODO #####
         # add the start pose to the tree
+        start_point = start_pose[0:3, [0]]
+        start_chi = start_pose[3]
+        end_point = end_pose[0:3, [0]]
+        end_chi = end_pose[3]
+        tree.add(ned=start_point, course=start_chi)
+
+        # check they're at the same altitude
+        assert (start_pose[2 == end_pose[2]])
+        self.pd = start_pose[2]
         
         # check to see if start_pose connects directly to end_pose
-       
+        if np.linalg.norm(start_point - end_point) < self.segment_length \
+                and not self.collision(start_pose, end_pose, world_map, radius):
+            # start connects to end
+            tree.add(ned=end_point, course=end_chi)
+        else:
+            # extend the tree until finding the end
+            self.extendTree(tree, end_pose, Va, world_map, radius)
+
         # find path with minimum cost to end_node
-        # waypoints_not_smooth = findMinimumPath()
+        waypoints_not_smooth = findMinimumPath(tree, end_pose)
         # waypoints = self.smoothPath()
         self.waypoint_not_smooth = waypoints_not_smooth
+        smoothed_waypoints = self.smoothPath(waypoints_not_smooth, world_map, radius)
         self.tree = tree
         return waypoints
 
