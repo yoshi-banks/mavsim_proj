@@ -6,6 +6,7 @@
 #         3/6/2024 - RWB
 # """
 import numpy as np
+from scipy import stats
 from typing import Callable
 
 
@@ -103,7 +104,8 @@ class ExtendedKalmanFilterContinuousDiscrete:
                            y: np.ndarray, 
                            u: np.ndarray, 
                            h: Callable, 
-                           R: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+                           R: np.ndarray,
+                           gate_threshold: float = None,) -> tuple[np.ndarray, np.ndarray]:
         '''
             Measurement update
                 update the state xhat and covarance P when a measurement is received
@@ -124,11 +126,13 @@ class ExtendedKalmanFilterContinuousDiscrete:
         # compute Jacobian of h with respect to x        
         H = self.jacobian(h, self.xhat, u)
         S_inv = np.linalg.inv(R + H @ self.P @ H.T) # innovation covariance
-        if True: #(y-h).T @ S_inv @ (y-h) < self.threshold:
+        # if True: 
+        if gate_threshold is None or (y-yhat).T @ S_inv @ (y-yhat) < gate_threshold:
             L = self.P @ H.T @ S_inv  # Kalman gain
             tmp = np.eye(self.n) - L @ H
             self.P = tmp @ self.P @ tmp.T + L @ R @ L.T # update covariance
-            self.xhat = self.xhat + L @ (y - yhat)  # update stae
+            self.xhat = self.xhat + L @ (y - yhat)  # update state
+
         return self.xhat, self.P
 
     def jacobian(self, fun: Callable, x: np.ndarray, u: np.ndarray) -> np.ndarray:

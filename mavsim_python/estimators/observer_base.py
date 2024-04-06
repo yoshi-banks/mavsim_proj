@@ -17,9 +17,9 @@ from message_types.msg_sensors import MsgSensors
 from estimators.filters import AlphaFilter, ExtendedKalmanFilterContinuousDiscrete
 from tools.jacobian import jacobian
 
-class Observer:
-    def __init__(self, ts: float, initial_measurements: MsgSensors=MsgSensors()):
-        self.Ts = ts  # sample rate of observer
+class ObserverBase:
+    def __init__(self, initial_measurements: MsgSensors=MsgSensors()):
+        # self.Ts = ts  # sample rate of observer
         # initialized estimated state message
         self.estimated_state = MsgState()
 
@@ -36,36 +36,37 @@ class Observer:
         self.lpf_diff = AlphaFilter(alpha=0.7, y0=initial_measurements.diff_pressure)
 
         # ekf for phi and theta
-        self.attitude_ekf = ExtendedKalmanFilterContinuousDiscrete(
-            f=self.f_attitude, 
-            Q = EST.Q_attitude,
-            P0= EST.P0_attitude,
-            xhat0=EST.xhat0_attitude,
-            Qu=EST.Qu_attitude,
-            Ts=ts,
-            N=5
-            )
+        # self.attitude_ekf = ExtendedKalmanFilterContinuousDiscrete(
+        #     f=self.f_attitude, 
+        #     Q = EST.Q_attitude,
+        #     P0= EST.P0_attitude,
+        #     xhat0=EST.xhat0_attitude,
+        #     Qu=EST.Qu_attitude,
+        #     Ts=ts,
+        #     N=5
+        #     )
         
         # ekf for pn, pe, Vg, chi, wn, we, psi
-        self.position_ekf = ExtendedKalmanFilterContinuousDiscrete(
-            f=self.f_smooth, 
-            Q=EST.Q_position,
-            P0=EST.P0_position,
-            xhat0=EST.xhat0_position,
-            Qu=EST.Qu_position,
-            Ts=ts,
-            N=10
-            )
+        # self.position_ekf = ExtendedKalmanFilterContinuousDiscrete(
+        #     f=self.f_smooth, 
+        #     Q=EST.Q_position,
+        #     P0=EST.P0_position,
+        #     xhat0=EST.xhat0_position,
+        #     Qu=EST.Qu_position,
+        #     Ts=ts,
+        #     N=10
+        #     )
         
         self.R_accel = EST.R_accel
         self.R_pseudo = EST.R_pseudo
         self.R_gps = EST.R_gps
+
         self.gps_n_old = 9999
         self.gps_e_old = 9999
         self.gps_Vg_old = 9999
         self.gps_course_old = 9999
 
-    def update(self, measurement: MsgSensors) -> MsgState:
+    def update(self, measurement: MsgSensors, t) -> MsgState:
         ##### TODO #####
         # estimates for p, q, r are low pass filter of gyro minus bias estimate
         self.estimated_state.p = self.lpf_gyro_x.update(measurement.gyro_x - SENSOR.gyro_x_bias)
@@ -87,19 +88,19 @@ class Observer:
                 [self.estimated_state.r],
                 [self.estimated_state.Va],
                 ])
-        xhat_attitude, P_attitude = self.attitude_ekf.propagate_model(u_attitude)
+        # propagate model
+        xhat_attitude, P_attitude = self.propagate_attitude_model(u_attitude, t)
+
         y_accel=np.array([
                 [measurement.accel_x],
                 [measurement.accel_y],
                 [measurement.accel_z],
                 ])
         
-        xhat_attitude, P_attitude = self.attitude_ekf.measurement_update(
+        xhat_attitude, P_attitude = self.measurement_attitude_accel_update(
             y=y_accel, 
             u=u_attitude,
-            h=self.h_accel,
-            R=self.R_accel,
-            gate_threshold=gate_threshold)
+            t=t)
         self.estimated_state.phi = xhat_attitude.item(0)
         self.estimated_state.theta = xhat_attitude.item(1)
 
@@ -111,14 +112,12 @@ class Observer:
                 [self.estimated_state.phi],
                 [self.estimated_state.theta],
                 ])
-        xhat_position, P_position=self.position_ekf.propagate_model(u_smooth)
+        xhat_position, P_position=self.propagate_position_model(u_smooth, t)
         y_pseudo = np.array([[0.], [0.]])
-        xhat_position, P_position=self.position_ekf.measurement_update(
+        xhat_position, P_position=self.measurement_position_pseudo_update(
             y=y_pseudo,
             u=u_smooth,
-            h=self.h_pseudo,
-            R=self.R_pseudo,
-            gate_threshold=gate_threshold)
+            t=t)
         
         # only update GPS when one of the signals changes
         if (measurement.gps_n != self.gps_n_old) \
@@ -131,11 +130,10 @@ class Observer:
                     [measurement.gps_Vg],
                     [wrap(measurement.gps_course, xhat_position.item(3))],
                     ])
-            xhat_position, P_position=self.position_ekf.measurement_update(
+            xhat_position, P_position=self.measurement_position_gps_update(
                 y=y_gps,
                 u=u_smooth,
-                h=self.h_gps,
-                R=self.R_gps)
+                t=t)
             # update stored GPS signals
             self.gps_n_old = measurement.gps_n
             self.gps_e_old = measurement.gps_e
@@ -157,6 +155,21 @@ class Observer:
         self.estimated_state.by = 0.0
         self.estimated_state.bz = 0.0
         return self.estimated_state
+    
+    def propagate_attitude_model(self, u: np.ndarray) -> np.ndarray:
+        return NotImplementedError
+    
+    def measurement_attitude_accel_update(self, y: np.ndarray, u: np.ndarray, h, R, gate_threshold: float) -> np.ndarray:
+        return NotImplementedError
+    
+    def propagate_position_model(self, u: np.ndarray) -> np.ndarray:
+        return NotImplementedError
+    
+    def measurement_position_pseudo_update(self, y: np.ndarray, u: np.ndarray, h, R, gate_threshold: float) -> np.ndarray:
+        return NotImplementedError
+    
+    def measurement_position_gps_update(self, y: np.ndarray, u: np.ndarray, h, R, gate_threshold: float) -> np.ndarray:
+        return NotImplementedError
 
     def f_attitude(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
         '''
@@ -270,6 +283,14 @@ class Observer:
             Jacobian of h(x, u) with respect to w
         '''
         return np.eye(7)
+    
+    def Gfunc_smooth(self, x: np.ndarray, u: np.ndarray)->np.ndarray:
+        '''
+            Jacobian of h(x, u) with respect to u
+        '''
+        func = lambda uin: self.f_smooth(x, uin)
+        J = jacobian(func, u)
+        return J
 
     def h_pseudo(self, x: np.ndarray, u: np.ndarray)->np.ndarray:
         '''

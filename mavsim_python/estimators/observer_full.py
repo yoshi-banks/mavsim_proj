@@ -11,99 +11,43 @@ import parameters.control_parameters as CTRL
 import parameters.simulation_parameters as SIM
 import parameters.sensor_parameters as SENSOR
 import parameters.aerosonde_parameters as MAV
+import parameters.estimation_parameters as EST
 from tools.rotations import euler_to_rotation
 from tools.wrap import wrap
 from message_types.msg_state import MsgState
 from message_types.msg_sensors import MsgSensors
 from estimators.filters import AlphaFilter, ExtendedKalmanFilterContinuousDiscrete
+from tools.linalg import S, cross
 
 
 class Observer:
-    def __init__(self, ts):
+    # def __init__(self, ts):
+    def __init__(self, ts, x):
         # initialized estimated state message
         ##### TODO #####        
+        Q = x.reshape(14, 14)
         self.ekf = ExtendedKalmanFilterContinuousDiscrete(
             f=self.f, 
-            Q = np.diag([
-                (0.)**2,  # pn
-                (0.)**2,  # pe
-                (0.)**2,  # pd
-                (0.)**2,  # u
-                (0.)**2,  # v
-                (0.)**2,  # w
-                (0.)**2,  # phi
-                (0.)**2,  # theta
-                (0.)**2,  # psi
-                (0.)**2,  # bx
-                (0.)**2,  # by
-                (0.)**2,  # bz
-                (0.)**2,  # wn
-                (0.)**2,  # we
-                ]),
-            P0= np.diag([
-                0**2,  # pn
-                0**2,  # pe
-                0**2,  # pd
-                0**2,  # u
-                0**2,  # v
-                0**2,  # w
-                np.radians(0)**2,  # phi
-                np.radians(0)**2,  # theta
-                np.radians(0)**2,  # psi
-                np.radians(0)**2,  # bx
-                np.radians(0)**2,  # by
-                np.radians(0)**2,  # bz
-                0**2,  # wn
-                0**2,  # we
-                ]), 
-            xhat0=np.array([[
-                MAV.north0,  # pn
-                MAV.east0,  # pe
-                MAV.down0,  # pd
-                MAV.Va0,  # u
-                0,  # v
-                0,  # w
-                0,  # phi
-                0,  # theta
-                MAV.psi0,  # psi
-                0,  # bx
-                0,  # by
-                0,  # bz
-                0,  # wn
-                0,  # we
-                ]]).T, 
-            Qu=np.diag([
-                SENSOR.gyro_sigma**2, 
-                SENSOR.gyro_sigma**2, 
-                SENSOR.gyro_sigma**2, 
-                SENSOR.accel_sigma**2,
-                SENSOR.accel_sigma**2,
-                SENSOR.accel_sigma**2]), 
+            Q = Q,
+            P0 = EST.P0,
+            xhat0 = EST.xhat0, 
+            Qu = EST.Qu,
             Ts=ts,
             N=10
             )
-        self.R_analog = np.diag([
-            SENSOR.abs_pres_sigma**2,
-            SENSOR.diff_pres_sigma**2,
-            (0.01)**2
-        ])
-        self.R_gps = np.diag([
-            SENSOR.gps_n_sigma**2,
-            SENSOR.gps_e_sigma**2,
-            SENSOR.gps_Vg_sigma**2,
-            SENSOR.gps_course_sigma**2
-        ])
-        self.R_pseudo = np.diag([
-                    (0.0)**2,  # pseudo measurement #1         ##### TODO #####
-                    (0.0)**2,  # pseudo measurement #2
-                    ])
+        
+        self.R_analog = EST.R_analog
+        self.R_gps = EST.R_gps
+        self.R_pseudo = EST.R_pseudo
         initial_measurements = MsgSensors()
-        ##### TODO #####
-        self.lpf_gyro_x = AlphaFilter(alpha=0., y0=initial_measurements.gyro_x)
-        self.lpf_gyro_y = AlphaFilter(alpha=0., y0=initial_measurements.gyro_y)
-        self.lpf_gyro_z = AlphaFilter(alpha=0., y0=initial_measurements.gyro_z)
+
+        self.lpf_gyro_x = AlphaFilter(alpha=0.3, y0=initial_measurements.gyro_x)
+        self.lpf_gyro_y = AlphaFilter(alpha=0.3, y0=initial_measurements.gyro_y)
+        self.lpf_gyro_z = AlphaFilter(alpha=0.3, y0=initial_measurements.gyro_z)
+
         self.analog_threshold = stats.chi2.isf(q=0.01, df=3)
         self.pseudo_threshold = stats.chi2.isf(q=0.01, df=2)
+
         self.gps_n_old = 9999
         self.gps_e_old = 9999
         self.gps_Vg_old = 9999
@@ -111,7 +55,13 @@ class Observer:
         self.estimated_state = MsgState()
         self.elapsed_time = 0
 
+        # state
+        # pn, pe, pd, u, v, w, phi, theta, psi, bx, by, bz, wn, we
+        # input
+        # gyro_x, gyro_y, gyro_z, accel_x, accel_y, accel_z
+
     def update(self, measurement):
+
         # system input
         u = np.array([[
             measurement.gyro_x, 
@@ -121,7 +71,9 @@ class Observer:
             measurement.accel_y, 
             measurement.accel_z,
             ]]).T
+        
         xhat, P = self.ekf.propagate_model(u)
+
         # update with analog measurement
         y_analog = np.array([
             [measurement.abs_pressure],
@@ -132,7 +84,9 @@ class Observer:
             y=y_analog, 
             u=u,
             h=self.h_analog,
-            R=self.R_analog)
+            R=self.R_analog,
+            gate_threshold=self.analog_threshold)
+        
         # update with wind triangle pseudo measurement
         y_pseudo = np.array([
             [0.],
@@ -142,7 +96,9 @@ class Observer:
             y=y_pseudo, 
             u=u,
             h=self.h_pseudo,
-            R=self.R_pseudo)
+            R=self.R_pseudo,
+            gate_threshold=self.pseudo_threshold)
+        
         # only update GPS when one of the signals changes
         if (measurement.gps_n != self.gps_n_old) \
             or (measurement.gps_e != self.gps_e_old) \
@@ -166,14 +122,12 @@ class Observer:
             self.gps_e_old = measurement.gps_e
             self.gps_Vg_old = measurement.gps_Vg
             self.gps_course_old = measurement.gps_course
+
         # convert internal xhat to MsgState format
         self.estimated_state = to_MsgState(xhat)
-        self.estimated_state.p = self.lpf_gyro_x.update(measurement.gyro_x) \
-            - self.estimated_state.bx
-        self.estimated_state.q = self.lpf_gyro_y.update(measurement.gyro_y) \
-            - self.estimated_state.by
-        self.estimated_state.r = self.lpf_gyro_z.update(measurement.gyro_z) \
-            - self.estimated_state.bz
+        self.estimated_state.p = self.lpf_gyro_x.update(measurement.gyro_x - self.estimated_state.bx)
+        self.estimated_state.q = self.lpf_gyro_y.update(measurement.gyro_y - self.estimated_state.by)
+        self.estimated_state.r = self.lpf_gyro_z.update(measurement.gyro_z - self.estimated_state.bz)
         self.elapsed_time += SIM.ts_control
         return self.estimated_state
 
@@ -181,12 +135,21 @@ class Observer:
         # system dynamics for propagation model: xdot = f(x, u)
         ##### TODO #####
         # pos   = x[0:3]
-        vel = x[3:6]
+        vel_body = x[3:6]
         Theta = x[6:9]
         bias = x[9:12]
         # wind = np.array([[x.item(12), x.item(13), 0]]).T
         y_gyro = u[0:3]
         y_accel = u[3:6]
+        g_vect = np.array([[0, 0, -MAV.gravity]]).T
+        # calculate rotation matrix
+        R = euler_to_rotation(Theta.item(0), Theta.item(1), Theta.item(2))
+        # calculate body frame accelerations
+        pos_dot = R @ vel_body
+        vel_dot = cross(vel_body) @ (y_gyro - bias) + y_accel + R.T @ g_vect   
+        Theta_dot = S(Theta) @ (y_gyro - bias)   
+        bias_dot = np.zeros((3,1))
+        wind_dot = np.zeros((2,1))  
         xdot = np.concatenate((pos_dot, vel_dot, Theta_dot, bias_dot, wind_dot), axis=0)
         return xdot
 
@@ -197,6 +160,15 @@ class Observer:
         vel_body = x[3:6]
         Theta = x[6:9]
         #bias = x[9:12]
+        wind = np.array([[x.item(12), x.item(13), 0]]).T
+        abs_pres = -MAV.rho * MAV.gravity * pos.item(2)
+        R = euler_to_rotation(Theta.item(0), Theta.item(1), Theta.item(2))
+        Va = (vel_body - R.T @ wind)
+        Va2 = Va.T @ Va
+        diff_pres = 0.5 * MAV.rho * Va2
+        diff_pres = diff_pres.item(0)
+        sideslip = np.array([[0, 1, 0]]) @ Va
+        sideslip = sideslip.item(0)
     
         y = np.array([[abs_pres, diff_pres, sideslip]]).T
         return y
@@ -208,20 +180,43 @@ class Observer:
         vel_body = x[3:6]
         Theta = x[6:9]
 
+        R = euler_to_rotation(Theta.item(0), Theta.item(1), Theta.item(2))
+
+        pn = pos.item(0)
+        pe = pos.item(1)
+        P = np.block([np.eye(2), np.zeros((2,1))])
+        vg_perp = P @ R @ vel_body
+        Vg = np.linalg.norm(vg_perp)
+        chi = np.arctan2(vg_perp.item(1), vg_perp.item(0))
+
         y = np.array([[pn, pe, Vg, chi]]).T
         return y
 
     def h_pseudo(self, x:np.ndarray, u:np.ndarray)->np.ndarray:
         ##### TODO ##### 
-        # measurement model for wind triangale pseudo measurement
+        # measurement model for wind triangle pseudo measurement
         #pos = x[0:3]
         vel_body = x[3:6]
         Theta = x[6:9]
+        psi = Theta.item(2)
         #bias = x[9:12]
+
+        R = euler_to_rotation(Theta.item(0), Theta.item(1), Theta.item(2))
         
+        wind = np.array([[x.item(12), x.item(13), 0]]).T
+        wn = wind.item(0)
+        we = wind.item(1)
+        Va = (vel_body - R.T @ wind)
+        Va = Va.item(0)
+
+        P = np.block([np.eye(2), np.zeros((2,1))])
+        vg_perp = P @ R @ vel_body
+        Vg = np.linalg.norm(vg_perp)
+        chi = np.arctan2(vg_perp.item(1), vg_perp.item(0))
+
         y = np.array([
-            [],  # wind triangle x
-            [],  # wind triangle y
+            [Va * np.cos(psi) + wn - Vg * np.cos(chi)],  # wind triangle x
+            [Va * np.sin(psi) + we - Vg * np.sin(chi)],  # wind triangle y
         ])
         return y
 
@@ -255,22 +250,3 @@ def to_MsgState(x: np.ndarray) -> MsgState:
     state.Vg = np.linalg.norm(vel_world)
     state.chi = np.arctan2(vel_world.item(1), vel_world.item(0))
     return state
-
-
-def cross(vec: np.ndarray)->np.ndarray:
-    return np.array([[0, -vec.item(2), vec.item(1)],
-                     [vec.item(2), 0, -vec.item(0)],
-                     [-vec.item(1), vec.item(0), 0]])
-
-
-def S(Theta:np.ndarray)->np.ndarray:
-    return np.array([[1,
-                      np.sin(Theta.item(0)) * np.tan(Theta.item(1)),
-                      np.cos(Theta.item(0)) * np.tan(Theta.item(1))],
-                     [0,
-                      np.cos(Theta.item(0)),
-                      -np.sin(Theta.item(0))],
-                     [0,
-                      (np.sin(Theta.item(0)) / np.cos(Theta.item(1))),
-                      (np.cos(Theta.item(0)) / np.cos(Theta.item(1)))]
-                     ])

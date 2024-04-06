@@ -63,6 +63,7 @@ class Viewers:
                 commanded_state,  # commanded states
                 delta)  # inputs to aircraft
         if self.sensor_plot_flag: 
+            # self.sensor_view.update(measurements, true_state)
             self.sensor_view.update(measurements)
         if self.animation_flag or self.data_plot_flag or self.sensor_plot_flag: 
             self.app.processEvents()

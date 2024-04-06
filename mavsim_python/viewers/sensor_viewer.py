@@ -93,6 +93,7 @@ class SensorViewer:
         self._data_recording_delay += self._dt
         self._time += self._dt
         
+    # def __update_data(self, sensors, true_state, t):
     def __update_data(self, sensors, t):
         #add the commanded state data
         self._plotter.add_data_point(plot_id='gyro_x', data_label='gyro_x', xvalue=t, yvalue=sensors.gyro_x)
@@ -108,6 +109,7 @@ class SensorViewer:
         self._plotter.add_data_point(plot_id='gps_h', data_label='gps_h', xvalue=t, yvalue=sensors.gps_h)
         self._plotter.add_data_point(plot_id='gps_Vg', data_label='gps_Vg', xvalue=t, yvalue=sensors.gps_Vg)
         self._plotter.add_data_point(plot_id='gps_course', data_label='gps_course', xvalue=t, yvalue=self.__rad_to_deg(sensors.gps_course))
+        # add the true state data
 
     def process_app(self):
         self._plotter.process_app(0)

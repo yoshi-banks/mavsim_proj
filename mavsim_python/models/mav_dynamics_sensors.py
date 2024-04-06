@@ -10,6 +10,7 @@ mavsim_python
 """
 import numpy as np
 from message_types.msg_sensors import MsgSensors
+from message_types.msg_state import MsgState
 import parameters.aerosonde_parameters as MAV
 import parameters.sensor_parameters as SENSOR
 from models.mav_dynamics_control import MavDynamics as MavDynamicsNoSensors
@@ -34,6 +35,7 @@ class MavDynamics(MavDynamicsNoSensors):
         p = self.true_state.p
         q = self.true_state.q
         r = self.true_state.r
+
         eta_gyro_x = np.random.randn() * SENSOR.gyro_sigma
         eta_gyro_y = np.random.randn() * SENSOR.gyro_sigma
         eta_gyro_z = np.random.randn() * SENSOR.gyro_sigma
@@ -68,7 +70,7 @@ class MavDynamics(MavDynamicsNoSensors):
         self._sensors.mag_z = mag_body.item(2) + np.random.normal(SENSOR.mag_beta, SENSOR.mag_sigma)
 
         # simulate pressure sensors
-        B_abs = 0
+        B_abs = 0 # TODO move to sensor parameters
         B_diff = 0
         eta_abs = np.random.randn() * SENSOR.abs_pres_sigma
         eta_diff = np.random.randn() * SENSOR.diff_pres_sigma
@@ -122,3 +124,89 @@ class MavDynamics(MavDynamicsNoSensors):
         self.true_state.bz = SENSOR.gyro_z_bias
         self.true_state.camera_az = self._state.item(13)
         self.true_state.camera_el = self._state.item(14)
+
+def state2measurement(state : MsgState, forces, t_gps, noise_flag=False):
+    "Return value of sensors on MAV: gyros, accels, absolute_pressure, dynamic_pressure, GPS"
+    sensors = MsgSensors()
+    # simulate rate gyros(units are rad / sec)
+    p = state.p
+    q = state.q
+    r = state.r
+
+    if noise_flag:
+        noise_gyro_x = np.random.normal(SENSOR.gyro_x_bias, SENSOR.gyro_sigma)
+        noise_gyro_y = np.random.normal(SENSOR.gyro_y_bias, SENSOR.gyro_sigma)
+        noise_gyro_z = np.random.normal(SENSOR.gyro_z_bias, SENSOR.gyro_sigma)
+    else:
+        noise_gyro_x = 0
+        noise_gyro_y = 0
+        noise_gyro_z = 0
+    sensors.gyro_x = p + noise_gyro_x
+    sensors.gyro_y = q + noise_gyro_y
+    sensors.gyro_z = r + noise_gyro_z
+
+    # simulate accelerometers(units of g)
+    fx = forces.item(0)
+    fy = forces.item(1)
+    fz = forces.item(2)
+    mass = MAV.mass
+    phi = state.phi
+    theta = state.theta
+    psi = state.psi
+    if noise_flag:
+        noise_accel_x = np.random.normal(0, SENSOR.accel_sigma)
+        noise_accel_y = np.random.normal(0, SENSOR.accel_sigma)
+        noise_accel_z = np.random.normal(0, SENSOR.accel_sigma)
+    else:
+        noise_accel_x = 0
+        noise_accel_y = 0
+        noise_accel_z = 0
+    sensors.accel_x = fx / mass + MAV.gravity * np.sin(theta) + noise_accel_x
+    sensors.accel_y = fy / mass - MAV.gravity * np.cos(theta) * np.sin(phi) + noise_accel_y
+    sensors.accel_z = fz / mass - MAV.gravity * np.cos(theta) * np.cos(phi) + noise_accel_z
+
+    # simulate magnetometers
+    # magnetic field in provo has magnetic declination of 12.5 degrees
+    # and magnetic inclination of 66 degrees
+    R_mag = euler_to_rotation(0, -SENSOR.mag_inclination, SENSOR.mag_declination)
+    mag_intertial = R_mag @ np.array([[1,0,0]]).T
+    R = euler_to_rotation(phi, theta, psi)
+    mag_body = R @ mag_intertial
+    if noise_flag:
+        noise_mag_x = np.random.normal(SENSOR.mag_beta, SENSOR.mag_sigma)
+        noise_mag_y = np.random.normal(SENSOR.mag_beta, SENSOR.mag_sigma)
+        noise_mag_z = np.random.normal(SENSOR.mag_beta, SENSOR.mag_sigma)
+    else:
+        noise_mag_x = 0
+        noise_mag_y = 0
+        noise_mag_z = 0
+    sensors.mag_x = mag_body.item(0) + noise_mag_x
+    sensors.mag_y = mag_body.item(1) + noise_mag_y
+    sensors.mag_z = mag_body.item(2) + noise_mag_z
+
+    # simulate pressure sensors
+    if noise_flag:
+        noise_abs = np.random.normal(SENSOR.abs_pres_bias, SENSOR.abs_pres_sigma)
+        noise_diff = np.random.normal(SENSOR.diff_pres_bias, SENSOR.diff_pres_sigma)
+    else:
+        noise_abs = 0
+        noise_diff = 0
+    sensors.abs_pressure = MAV.rho * MAV.gravity * state.altitude + noise_abs
+    sensors.diff_pressure = MAV.rho * state.Va**2 / 2 + noise_diff
+    
+    # simulate GPS sensor
+    if t_gps >= SENSOR.ts_gps:
+        gps_eta_n = np.exp(-SENSOR.gps_k * SENSOR.ts_gps) * gps_eta_n + SENSOR.ts_gps * np.random.normal(0, SENSOR.gps_n_sigma)
+        gps_eta_e = np.exp(-SENSOR.gps_k * SENSOR.ts_gps) * gps_eta_e + SENSOR.ts_gps * np.random.normal(0, SENSOR.gps_e_sigma)
+        gps_eta_h = np.exp(-SENSOR.gps_k * SENSOR.ts_gps) * gps_eta_h + SENSOR.ts_gps * np.random.normal(0, SENSOR.gps_h_sigma)
+        sensors.gps_n = state.north + gps_eta_n
+        sensors.gps_e = state.east + gps_eta_e
+        sensors.gps_h = state.altitude + gps_eta_h
+        Vn = state.Va * np.cos(state.psi) + state.wn
+        Ve = state.Va * np.sin(state.psi) + state.we
+        sensors.gps_Vg = np.sqrt(Vn**2 + Ve**2) + np.random.normal(0, SENSOR.gps_Vg_sigma)
+        sensors.gps_course = np.arctan2(Ve, Vn) + np.random.normal(0, SENSOR.gps_course_sigma)
+        t_gps = 0.
+    # else:
+    #     t_gps += ts_simulation
+    return sensors

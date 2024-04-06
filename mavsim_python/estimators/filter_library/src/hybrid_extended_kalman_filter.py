@@ -1,5 +1,6 @@
 import numpy as np
-from src.utils import is_column_vector, is_square_matrix, rk4
+# from src.utils import is_column_vector, is_square_matrix, rk4
+from estimators.filter_library.src.utils import is_column_vector, is_square_matrix, rk4
 
 class HybridExtendedKalmanFilter:   
     """
@@ -7,7 +8,7 @@ class HybridExtendedKalmanFilter:
     See "Optimal State Estimation" by Dan Simon, page 406.
     """
 
-    def __init__(self, f, h, Q, R, x0, P0, t0, Afunc, Lfunc, Hfunc, Mfunc):
+    def __init__(self, x0, P0, t0):
         """
         Construct an instance of the HybridExtendedKalmanFilter class.
 
@@ -25,23 +26,24 @@ class HybridExtendedKalmanFilter:
             Mfunc: Function to compute M matrix (measurement noise Jacobian).
         """
         # add checks for F, G, H, Q, R, x0, P0
-        assert isinstance(R, np.ndarray)
+        # assert isinstance(R, np.ndarray)
         assert isinstance(x0, np.ndarray)
         assert isinstance(P0, np.ndarray)
         assert is_column_vector(x0)
 
         self._xdim = x0.shape[0]  # Dimension of state vector
         # self._udim = 
-        self._ydim = R.shape[0]
+        # self._ydim = R.shape[0]
 
-        assert is_square_matrix(Q) and is_square_matrix(R) and is_square_matrix(P0)
-        assert Q.shape[0] == self._xdim and Q.shape[1] == self._xdim
-        assert R.shape[0] == self._ydim and R.shape[1] == self._ydim
+        # assert is_square_matrix(Q) and is_square_matrix(R) and is_square_matrix(P0)
+        # assert Q.shape[0] == self._xdim and Q.shape[1] == self._xdim
+        # assert R.shape[0] == self._ydim and R.shape[1] == self._ydim
 
-        self.f = f
-        self.h = h
-        self.Q = Q
-        self.R = R
+        # self.f = f
+        # self.h = h
+        # self.Q = Q
+        # self.Qu = Qu
+        # self.R = R
         self.x_hat_minus = x0
         self.P_minus = P0
         self.x_hat_plus = x0
@@ -50,15 +52,15 @@ class HybridExtendedKalmanFilter:
         self.P = P0
         self.t_minus = t0
 
-        self.Afunc = Afunc
-        self.Lfunc = Lfunc
-        self.Hfunc = Hfunc
-        self.Mfunc = Mfunc
+        # self.Afunc = Afunc
+        # self.Hfunc = Hfunc
+        # self.Mfunc = Mfunc
+        # self.Lfunc = Lfunc
 
         # TODO add checks that these functions return the right sized output
 
 
-    def predict(self, u, t, params):
+    def predict(self, u, t, params, dyn_params):
         """
         Prediction step of the Hybrid EKF.
 
@@ -66,30 +68,41 @@ class HybridExtendedKalmanFilter:
             u: Control input.
             t: Current time.
             params: Additional parameters (not used in this implementation).
-
+            dyn_funcs: Dictionary of dynamics functions.
+                'f': State transition function.
+                'Gfunc': Function to compute G matrix (control input Jacobian).
+                'Afunc': State transition function.
+                'Lfunc': Function to compute L matrix (process noise Jacobian).
+                'Q': Process noise covariance matrix.
+                'Qu': Control input noise covariance matrix.
+                
         Returns:
             None
         """
         x = self.x_hat
         P = self.P
 
-        A = self.Afunc(x, u, t, params)
-        L = self.Lfunc(x, u, t, params)
+        A = dyn_params['Afunc'](x, u, t, params)
+        L = dyn_params['Lfunc'](x, u, t, params)
+        G = dyn_params['Gfunc'](x, u, t, params)
+        f = dyn_params['f']
+        Q = dyn_params['Q']
+        Qu = dyn_params['Qu']
 
         # forward dynamics using Runge-Kutta 4th order method
         dt = t - self.t_minus
         self.t_minus = t
-        simfunc = lambda t, x: self.f(x, u, np.zeros_like(x), t, params)
+        simfunc = lambda tin, xin: f(xin, u, tin, params)
         self.x_hat_minus = rk4(simfunc, t, dt, x)
 
         # forward state covariance using Runge-Kutta 4th order method
-        simfunc = lambda t, P: A @ P + P @ A.T + L @ self.Q @ L.T
+        simfunc = lambda tin, Pin: A @ Pin + Pin @ A.T + L @ Q @ L.T #+ G @ Qu @ G.T
         self.P_minus = rk4(simfunc, t, dt, P)
 
         self.x_hat = self.x_hat_minus
         self.P = self.P_minus
     
-    def update(self, z, u, t, params):
+    def update(self, y, u, t, params, meas_params):
         """
         Update step of the Hybrid EKF.
 
@@ -98,6 +111,10 @@ class HybridExtendedKalmanFilter:
             u: Control input.
             t: Current time.
             params: Additional parameters (not used in this implementation).
+            meas_funcs: Dictionary of measurement functions.
+                'h': Measurement function.
+                'Hfunc': Function to compute H matrix (measurement Jacobian).
+                'Mfunc': Function to compute M matrix (measurement noise Jacobian).
 
         Returns:
             None
@@ -105,13 +122,20 @@ class HybridExtendedKalmanFilter:
         x = self.x_hat
         P = self.P
 
-        H = self.Hfunc(x, u, t, params)
-        M = self.Mfunc(x, u, t, params)
+        H = meas_params['Hfunc'](x, u, t, params)
+        M = meas_params['Mfunc'](x, u, t, params)
+        h = meas_params['h']
+        R = meas_params['R']
+        gate_threshold = meas_params['gate_threshold']
 
-        K = P @ H.T @ np.linalg.inv(H @ P @ H.T + M @ self.R @ M.T)
-        x = x + K @ (z - self.h(x, np.zeros_like(z), t, params))
-        IKH = np.eye(P.shape[0]) - K @ H
-        P = IKH @ P @ IKH.T + K @ M @ self.R @ M.T @ K.T
+        S_inv = np.linalg.inv(H @ P @ H.T + M @ R @ M.T)
+        yhat = h(x, u, t, params)
+
+        if gate_threshold is None or (y - yhat).T @ S_inv @ (y - yhat) < gate_threshold:
+            K = P @ H.T @ S_inv
+            IKH = np.eye(P.shape[0]) - K @ H
+            P = IKH @ P @ IKH.T + K @ M @ R @ M.T @ K.T
+            x = x + K @ (y - yhat)
 
         self.x_hat_plus = x
         self.P_plus = P
