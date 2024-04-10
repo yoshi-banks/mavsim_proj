@@ -23,13 +23,13 @@ Qu_attitude=np.diag([
     SENSOR.abs_pres_sigma])
 
 Q_position=np.diag([
-    (10e-10)**2,  # pn
-    (10e-10)**2,  # pe
-    (10e-10)**2,  # Vg
-    (10e-10)**2, # chi
-    (10e-10)**2, # wn
-    (10e-10)**2, # we
-    (10e-10)**2, # psi
+    (10e-2)**2,  # pn
+    (10e-2)**2,  # pe
+    (10e-4)**2,  # Vg
+    (10e-4)**2, # chi
+    (10e-4)**2, # wn
+    (10e-4)**2, # we
+    (10e-4)**2, # psi
     ])
 P0_position=np.diag([
     (.01)**2, # pn
@@ -67,7 +67,7 @@ R_pseudo = np.diag([
         0.01,  # pseudo measurement #1 ##### TODO #####
         0.01,  # pseudo measurement #2 ##### TODO #####
         ])
-pseudo_gate_threshold = stats.chi2.isf(q=0.01, df=3)
+pseudo_gate_threshold = stats.chi2.isf(q=0.01, df=2)
 R_gps = np.diag([
         SENSOR.gps_n_sigma**2,  # y_gps_n
         SENSOR.gps_e_sigma**2,  # y_gps_e

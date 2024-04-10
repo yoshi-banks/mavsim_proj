@@ -9,7 +9,7 @@ import numpy as np
 from scipy import stats
 import parameters.control_parameters as CTRL
 import parameters.sensor_parameters as SENSOR
-import parameters.estimation_parameters1 as EST
+import parameters.estimation_parameters_ekf as EST
 import parameters.aerosonde_parameters as MAV
 from tools.wrap import wrap
 from message_types.msg_state import MsgState

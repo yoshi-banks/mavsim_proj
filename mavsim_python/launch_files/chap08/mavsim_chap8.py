@@ -24,6 +24,7 @@ from controllers.autopilot import Autopilot
 #from controllers.lqr_with_rate_damping import Autopilot
 # from estimators.observer import Observer
 from estimators.observer_ekf import ObserverEKF as Observer
+# from estimators.observer_ukf import ObserverUKF as Observer
 from viewers.manage_viewers import Viewers
 
 #quitter = QuitListener()
@@ -32,6 +33,7 @@ from viewers.manage_viewers import Viewers
 wind = WindSimulation(SIM.ts_simulation)
 mav = MavDynamics(SIM.ts_simulation)
 autopilot = Autopilot(SIM.ts_simulation)
+# observer = Observer(SIM.ts_simulation)
 observer = Observer(t0=0)
 viewers = Viewers()
 
@@ -66,11 +68,14 @@ while sim_time < end_time:
 
     # -------- autopilot -------------
     measurements = mav.sensors()  # get sensor measurements
+
     # estimated_state = observer.update(measurements)  # estimate states from measurements
     estimated_state = observer.update(measurements, sim_time)  # estimate states from measurements
 
-    delta, commanded_state = autopilot.update(commands, estimated_state)
-    # delta, commanded_state = autopilot.update(commands, mav.true_state)
+    if sim_time < 1 * end_time:
+        delta, commanded_state = autopilot.update(commands, mav.true_state)
+    else:
+        delta, commanded_state = autopilot.update(commands, estimated_state)
 
     # -------- physical system -------------
     current_wind = wind.update()  # get the new wind vector

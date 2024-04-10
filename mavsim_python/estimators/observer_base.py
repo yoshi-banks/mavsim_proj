@@ -9,8 +9,9 @@ import numpy as np
 from scipy import stats
 import parameters.control_parameters as CTRL
 import parameters.sensor_parameters as SENSOR
-import parameters.estimation_parameters1 as EST
+import parameters.estimation_parameters_ekf as EST
 import parameters.aerosonde_parameters as MAV
+from estimators.filter_library.src.utils import rk4
 from tools.wrap import wrap
 from message_types.msg_state import MsgState
 from message_types.msg_sensors import MsgSensors
@@ -187,6 +188,15 @@ class ObserverBase:
                          [q * np.cos(phi) - r * np.sin(phi)]])
         return xdot
     
+    def fdis_attitude(self, x: np.ndarray, u: np.ndarray, t, params) -> np.ndarray:
+        '''
+        
+        '''
+        dt = params['dt']
+        simfunc = lambda tin, xin: self.f_attitude(xin, u)
+        xnext = rk4(simfunc, t, dt, x)
+        return xnext
+    
     def Afunc_attitude(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
         '''
             Jacobian of f(x, u) with respect to x
@@ -269,6 +279,15 @@ class ObserverBase:
                          [0.], 
                          [psid]])
         return xdot
+    
+    def fdis_smooth(self, x: np.ndarray, u: np.ndarray, t, params) -> np.ndarray:
+        '''
+        
+        '''
+        dt = params['dt']
+        simfunc = lambda tin, xin: self.f_smooth(xin, u)
+        xnext = rk4(simfunc, t, dt, x)
+        return xnext
     
     def Afunc_smooth(self, x: np.ndarray, u: np.ndarray)->np.ndarray:
         '''
