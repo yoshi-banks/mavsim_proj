@@ -26,6 +26,7 @@ from controllers.autopilot import Autopilot
 # from estimators.observer_lkf import ObserverLKF as Observer
 # from estimators.observer_ekf import ObserverEKF as Observer
 # from estimators.observer_ukf import ObserverUKF as Observer
+from estimators.observer_pf import ObserverPF as Observer
 
 from viewers.manage_viewers import Viewers
 
