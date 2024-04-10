@@ -23,8 +23,10 @@ from models.wind_simulation import WindSimulation
 from controllers.autopilot import Autopilot
 #from controllers.lqr_with_rate_damping import Autopilot
 # from estimators.observer import Observer
-from estimators.observer_ekf import ObserverEKF as Observer
+# from estimators.observer_lkf import ObserverLKF as Observer
+# from estimators.observer_ekf import ObserverEKF as Observer
 # from estimators.observer_ukf import ObserverUKF as Observer
+
 from viewers.manage_viewers import Viewers
 
 #quitter = QuitListener()
