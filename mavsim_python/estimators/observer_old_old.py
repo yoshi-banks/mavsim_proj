@@ -16,7 +16,7 @@ from tools.wrap import wrap
 from message_types.msg_state import MsgState
 from message_types.msg_sensors import MsgSensors
 from estimators.filters import ExtendedKalmanFilterContinuousDiscrete
-import parameters.estimation_parameters1 as EST
+import parameters.estimation_parameters_ekf as EST
 
 class Observer:
     def __init__(self, ts_control, initial_state = MsgState(), initial_measurements = MsgSensors()):
